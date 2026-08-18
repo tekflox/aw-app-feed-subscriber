@@ -1,11 +1,13 @@
 {
   "manifest_version": 1,
-  "id": "aw-app-template",
-  "name": "App Template",
-  "version": "0.12.2",
-  "description": "TEMPLATE \u2014 the fastest way to start a new aw-workspace app. Install it and you have a working app on day one: a `hello` CLI that prints a configurable greeting, its own window in the Apps grid, and an HTTP + WebSocket backend \u2014 with tests and marketplace release already wired. Rename everything marked TEMPLATE/hello to make it yours; see README.md.",
+  "id": "feed-subscriber",
+  "name": "Feed Subscriber",
+  "version": "0.1.0",
+  "description": "Ports agentic-workspace's Feed Subscriber into aw-workspace: an asyncio poller — one independent task per configured \"card\" — watches a JSON source URL on its own interval and, when the response changes since the last poll, fires a Webhook Call or an Agent Call (POST /api/agents/{slug}/run on agents-platform) describing what changed. The last polled response and change history per card are exposed read-only through the list_feed_entries MCP tool. Configuration is a component-mode CRUD window (Settings → Feed Subscriber); each card's auth_token is routed to the zero-knowledge secret store, never stored in plain config.",
+  "icon": "rss",
   "tier": "inprocess",
   "requires_ui_refresh": true,
+  "category": "Integrations",
   "publisher": "TekFlox",
   "resource_estimate": {
     "cpu": "low",
@@ -14,57 +16,90 @@
   },
   "runtime": {
     "python": ">=3.11",
-    "entrypoint": "template_app.plugin:HelloAppPlugin",
-    "pip_requires": [],
-    "standalone": {
-      "module": "template_app",
-      "default_port": 9400
-    }
+    "entrypoint": "feed_subscriber_app.plugin:FeedSubscriberAppPlugin",
+    "pip_requires": [
+      "httpx"
+    ]
   },
   "permissions": [
-    "commands:install",
-    "fs:workspace-data",
     "routes:register",
-    "ui:code",
-    "ui:slots:core.nav"
+    "secrets:own",
+    "fs:workspace-data",
+    "net:outbound",
+    "watchdog:tasks",
+    "ui:code"
   ],
   "contributes": {
-    "system_clis": [
-      {
-        "name": "hello",
-        "installer": "scripts/install_hello.sh",
-        "verify": "hello --version"
-      }
-    ],
     "routes": [
       {
-        "prefix": "/api/apps/aw-app-template"
+        "prefix": "/api/apps/feed-subscriber"
+      }
+    ],
+    "windows": [
+      {
+        "id": "feed-subscriber.main",
+        "title": "Feed Subscriber",
+        "icon": "rss",
+        "body": {
+          "type": "component"
+        }
       }
     ],
     "frontend": {
       "mode": "component",
-      "bundle": "ui/dist/template.js"
+      "bundle": "ui/dist/feed-subscriber-ui.mjs",
+      "slots": [
+        "core.window.body:feed-subscriber.main"
+      ]
+    },
+    "mcp": {
+      "reload_on_save": true,
+      "provides": [
+        "list_feed_entries"
+      ]
     },
     "skills": [
       {
-        "id": "aw-create-app",
-        "path": "skills/aw-create-app/SKILL.md",
-        "description": "How to author a decoupled aw-workspace app from this template \u2014 manifest, tiers, capabilities, contributes, backend routes (HTTP+WS), frontend code, standalone mode, window widgets, install + marketplace release."
+        "id": "aw-feed-subscriber",
+        "path": "skills/aw-feed-subscriber/SKILL.md",
+        "description": "What a Feed Subscriber card is, when to configure Webhook Call vs Agent Call, how to read a card's cached state with list_feed_entries, and how to diagnose a feed that stopped firing."
       }
     ]
   },
   "config_schema": {
     "type": "object",
     "properties": {
-      "greeting": {
+      "cards": {
+        "type": "array",
+        "default": [],
+        "description": "Feed subscription cards. Managed through this app's own CRUD routes (GET/POST/PUT/DELETE /api/apps/feed-subscriber/cards), not this raw field — each card's auth_token is stripped before it ever reaches this array and lives in the secret store instead, keyed card:<id>:auth_token. Ported from agentic-workspace's src/config/aw.json -> feed_subscriber.cards.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {"type": "string"},
+            "name": {"type": "string"},
+            "source_url": {"type": "string"},
+            "poll_interval_seconds": {"type": "number"},
+            "call_type": {"type": "string"},
+            "webhook_url": {"type": "string"},
+            "agent_slug": {"type": "string"},
+            "target_slug": {"type": "string"}
+          }
+        }
+      },
+      "agents_platform_base": {
         "type": "string",
-        "default": "Hello",
-        "description": "Word the installed `hello` command prints before the target name, e.g. \"Hello, world!\"."
+        "default": "http://172.18.0.1:10014",
+        "description": "Base URL of the agents-platform instance an Agent Call card dispatches to (POST /api/agents/{slug}/run). Same default + reachability rationale as aw-app-agents-platform-runners' own agents_platform_base — 172.18.0.1 is the bridge gateway reachable from this workspace's container; override if your subnet differs."
+      },
+      "agents_platform_token": {
+        "type": "string",
+        "x-secret": true,
+        "description": "Bearer token sent on every Agent Call dispatch and on the agent-picker lookup this app's config UI uses to populate the Agent dropdown. Optional — leave blank if agents-platform on this workspace doesn't require identity auth; required if it does (see aw-app-agents-platform-runners' agents_platform_token for how to mint one)."
       }
     },
     "required": []
   },
-  "config_visible": false,
   "dependencies": {},
   "migrations": {}
 }
