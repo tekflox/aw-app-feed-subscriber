@@ -2,8 +2,8 @@
   "manifest_version": 1,
   "id": "feed-subscriber",
   "name": "Feed Subscriber",
-  "version": "0.1.0",
-  "description": "Ports agentic-workspace's Feed Subscriber into aw-workspace: an asyncio poller — one independent task per configured \"card\" — watches a JSON source URL on its own interval and, when the response changes since the last poll, fires a Webhook Call or an Agent Call (POST /api/agents/{slug}/run on agents-platform) describing what changed. The last polled response and change history per card are exposed read-only through the list_feed_entries MCP tool. Configuration is a component-mode CRUD window (Settings → Feed Subscriber); each card's auth_token is routed to the zero-knowledge secret store, never stored in plain config.",
+  "version": "0.2.0",
+  "description": "Ports agentic-workspace's Feed Subscriber into aw-workspace: an asyncio poller \u2014 one independent task per configured \"card\" \u2014 watches a JSON source URL on its own interval and, when the response changes since the last poll, fires a Webhook Call or an Agent Call (POST /api/agents/{slug}/run on agents-platform) describing what changed. The last polled response and change history per card are exposed read-only through the list_feed_entries MCP tool. Configuration is a component-mode CRUD window (Settings \u2192 Feed Subscriber); each card's auth_token is routed to the zero-knowledge secret store, never stored in plain config.",
   "icon": "rss",
   "tier": "inprocess",
   "requires_ui_refresh": true,
@@ -72,30 +72,46 @@
       "cards": {
         "type": "array",
         "default": [],
-        "description": "Feed subscription cards. Managed through this app's own CRUD routes (GET/POST/PUT/DELETE /api/apps/feed-subscriber/cards), not this raw field — each card's auth_token is stripped before it ever reaches this array and lives in the secret store instead, keyed card:<id>:auth_token. Ported from agentic-workspace's src/config/aw.json -> feed_subscriber.cards.",
+        "description": "Feed subscription cards. Managed through this app's own CRUD routes (GET/POST/PUT/DELETE /api/apps/feed-subscriber/cards), not this raw field \u2014 each card's auth_token is stripped before it ever reaches this array and lives in the secret store instead, keyed card:<id>:auth_token. Ported from agentic-workspace's src/config/aw.json -> feed_subscriber.cards.",
         "items": {
           "type": "object",
           "properties": {
-            "id": {"type": "string"},
-            "name": {"type": "string"},
-            "source_url": {"type": "string"},
-            "poll_interval_seconds": {"type": "number"},
-            "call_type": {"type": "string"},
-            "webhook_url": {"type": "string"},
-            "agent_slug": {"type": "string"},
-            "target_slug": {"type": "string"}
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "source_url": {
+              "type": "string"
+            },
+            "poll_interval_seconds": {
+              "type": "number"
+            },
+            "call_type": {
+              "type": "string"
+            },
+            "webhook_url": {
+              "type": "string"
+            },
+            "agent_slug": {
+              "type": "string"
+            },
+            "target_slug": {
+              "type": "string"
+            }
           }
         }
       },
       "agents_platform_base": {
         "type": "string",
         "default": "http://172.18.0.1:10014",
-        "description": "Base URL of the agents-platform instance an Agent Call card dispatches to (POST /api/agents/{slug}/run). Same default + reachability rationale as aw-app-agents-platform-runners' own agents_platform_base — 172.18.0.1 is the bridge gateway reachable from this workspace's container; override if your subnet differs."
+        "description": "Base URL of the agents-platform instance an Agent Call card dispatches to (POST /api/agents/{slug}/run). Same default + reachability rationale as aw-app-agents-platform-runners' own agents_platform_base \u2014 172.18.0.1 is the bridge gateway reachable from this workspace's container; override if your subnet differs."
       },
       "agents_platform_token": {
         "type": "string",
         "x-secret": true,
-        "description": "Bearer token sent on every Agent Call dispatch and on the agent-picker lookup this app's config UI uses to populate the Agent dropdown. Optional — leave blank if agents-platform on this workspace doesn't require identity auth; required if it does (see aw-app-agents-platform-runners' agents_platform_token for how to mint one)."
+        "description": "Bearer token sent on every Agent Call dispatch and on the agent-picker lookup this app's config UI uses to populate the Agent dropdown. Optional \u2014 leave blank if agents-platform on this workspace doesn't require identity auth; required if it does (see aw-app-agents-platform-runners' agents_platform_token for how to mint one)."
       }
     },
     "required": []
