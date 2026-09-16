@@ -2,7 +2,7 @@
   "manifest_version": 1,
   "id": "feed-subscriber",
   "name": "Feed Subscriber",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Ports agentic-workspace's Feed Subscriber into aw-workspace: an asyncio poller \u2014 one independent task per configured \"card\" \u2014 watches a JSON source URL on its own interval and, when the response changes since the last poll, fires a Webhook Call or an Agent Call (POST /api/agents/{slug}/run on agents-platform) describing what changed. The last polled response and change history per card are exposed read-only through the list_feed_entries MCP tool. Configuration is a component-mode CRUD window (Settings \u2192 Feed Subscriber); each card's auth_token is routed to the zero-knowledge secret store, never stored in plain config.",
   "icon": "rss",
   "tier": "inprocess",
