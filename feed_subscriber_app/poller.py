@@ -131,13 +131,20 @@ async def dispatch_webhook(client: httpx.AsyncClient, card: dict, message: str) 
 async def dispatch_agent(client: httpx.AsyncClient, card: dict, message: str, *,
                           agents_platform_base: str, agents_platform_token: str | None) -> None:
     agent_slug = (card.get("agent_slug") or "").strip()
+    name = card.get("name", card.get("id"))
     if not agent_slug:
-        log.info("[%s] Agent call configured but agent_slug is empty", card.get("name", card.get("id")))
+        log.info("[%s] Agent call configured but agent_slug is empty", name)
         return
     target_slug = (card.get("target_slug") or "").strip() or "w-feed-subscriber"
     headers = {}
     if agents_platform_token:
         headers["Authorization"] = f"Bearer {agents_platform_token}"
+    else:
+        log.error(
+            "[%s] feed-subscriber misconfiguration: agents_platform_token is not set — "
+            "Agent Call to %s will be dispatched unauthenticated and is expected to be rejected",
+            name, agent_slug,
+        )
     try:
         resp = await client.post(
             f"{agents_platform_base.rstrip('/')}/api/agents/{agent_slug}/run",
@@ -145,9 +152,12 @@ async def dispatch_agent(client: httpx.AsyncClient, card: dict, message: str, *,
             headers=headers,
             timeout=15,
         )
-        log.info("[%s] Agent call -> %s (%s): %s", card.get("name"), agent_slug, resp.status_code, resp.text[:200])
+        if resp.status_code >= 400:
+            log.error("[%s] Agent call -> %s (%s) FAILED: %s", name, agent_slug, resp.status_code, resp.text[:200])
+        else:
+            log.info("[%s] Agent call -> %s (%s): %s", name, agent_slug, resp.status_code, resp.text[:200])
     except Exception as exc:  # noqa: BLE001 — a dead agents-platform must never crash the poller
-        log.warning("[%s] Agent call failed: %s", card.get("name"), exc)
+        log.warning("[%s] Agent call failed: %s", name, exc)
 
 
 async def poll_card(card_id: str, get_card: Callable[[str], dict | None],

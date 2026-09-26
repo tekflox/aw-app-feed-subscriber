@@ -203,6 +203,39 @@ class TestDispatchAgent:
         _run(fs.dispatch_agent(mock_client, {"name": "Feed A", "agent_slug": "my-agent"}, "msg",
                                 agents_platform_base="http://ap.example.com", agents_platform_token=None))
 
+    def test_missing_token_logs_error_before_the_doomed_call(self, caplog):
+        card = {"name": "Feed A", "agent_slug": "my-agent"}
+        mock_client = MagicMock()
+        mock_client.post = AsyncMock(return_value=MagicMock(status_code=401, text="Unauthorized"))
+
+        with caplog.at_level("ERROR", logger="aw_apps.feed_subscriber.poller"):
+            _run(fs.dispatch_agent(mock_client, card, "msg",
+                                    agents_platform_base="http://ap.example.com", agents_platform_token=None))
+
+        misconfig_records = [r for r in caplog.records if "agents_platform_token" in r.message]
+        assert misconfig_records, "expected an ERROR log naming the missing agents_platform_token field"
+        assert misconfig_records[0].levelname == "ERROR"
+        # the misconfiguration is logged before the dispatch is even attempted
+        post_call_index = next(i for i, r in enumerate(caplog.records) if "Agent call" in r.message.lower()
+                                or "FAILED" in r.message)
+        assert caplog.records.index(misconfig_records[0]) < post_call_index
+        mock_client.post.assert_called_once()  # still dispatched — no token wiring added here
+
+    def test_non_2xx_response_logged_loudly_not_like_success(self, caplog):
+        card = {"name": "Feed A", "agent_slug": "my-agent"}
+        mock_client = MagicMock()
+        mock_client.post = AsyncMock(return_value=MagicMock(status_code=401, text="Unauthorized: bad token"))
+
+        with caplog.at_level("INFO", logger="aw_apps.feed_subscriber.poller"):
+            _run(fs.dispatch_agent(mock_client, card, "msg",
+                                    agents_platform_base="http://ap.example.com", agents_platform_token="tok"))
+
+        failure_records = [r for r in caplog.records if "FAILED" in r.message]
+        assert failure_records, "expected a loud log entry for the non-2xx response"
+        assert failure_records[0].levelname in ("ERROR", "WARNING")
+        assert "401" in failure_records[0].message
+        assert not any(r.levelname == "INFO" and "Agent call ->" in r.message for r in caplog.records)
+
 
 # ---------------------------------------------------------------------------
 # poll_card — one iteration: change detection end-to-end against a mocked
