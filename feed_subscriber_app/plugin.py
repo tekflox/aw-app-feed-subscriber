@@ -31,6 +31,24 @@ from .mcp import self_register as mcp_self_register
 log = logging.getLogger("aw_apps.feed_subscriber")
 
 
+def cards_with_secrets(cards: list[dict], secrets) -> list[dict]:
+    """Merge each card's ``auth_token`` back in from the secret store it was
+    stripped into by ``routes.py`` on every write. The poller needs the real
+    token to put it on the ``Authorization`` header; ``ctx.config`` (and
+    anything reading cards straight off it, e.g. the ``/cards`` API) must
+    never see it in plain config."""
+    merged = []
+    for card in cards:
+        card = dict(card)
+        card_id = card.get("id")
+        if card_id:
+            token = secrets.read(routes_mod._card_secret_key(card_id))
+            if token:
+                card["auth_token"] = token
+        merged.append(card)
+    return merged
+
+
 class FeedSubscriberAppPlugin:
     async def activate(self, ctx) -> None:
         self.ctx = ctx
@@ -43,12 +61,15 @@ class FeedSubscriberAppPlugin:
         def _get_cards() -> list[dict]:
             return list((ctx.config or {}).get("cards") or [])
 
+        def _get_cards_for_poller() -> list[dict]:
+            return cards_with_secrets(_get_cards(), ctx.secrets)
+
         def _get_agents_platform() -> tuple[str, str | None]:
             cfg = ctx.config or {}
             base = cfg.get("agents_platform_base") or poller_mod.DEFAULT_AGENTS_PLATFORM_BASE
             return base, cfg.get("agents_platform_token")
 
-        self._supervisor = poller_mod.PollerSupervisor(_get_cards, _get_agents_platform)
+        self._supervisor = poller_mod.PollerSupervisor(_get_cards_for_poller, _get_agents_platform)
         ctx.watchdog.register("reconcile", self._supervisor.reconcile,
                               poller_mod.RECONCILE_INTERVAL_S, run_immediately=True)
 
